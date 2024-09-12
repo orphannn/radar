@@ -151,7 +151,7 @@
             // Retrieve WebSocket URL from URL parameters
             const urlParams = new URLSearchParams(window.location.search);
             const wsParam = urlParams.get('ws');
-            const wsUrl = wsParam ? `ws://${wsParam}:2334` : `ws://127.0.0.1:2334`;
+            const wsUrl = wsParam ? `ws://${wsParam}` : `ws://127.0.0.1:2334`;
 
             // Print the WebSocket URL to the console
             // console.log(`Connecting to WebSocket server at: ${wsUrl}`);
