@@ -89,6 +89,7 @@
         "#9932CC", "#BA55D3", "#DDA0DD", "#EE82EE", "#DA70D6", "#FF00FF", "#FF1493",
         "#DB7093", "#FF69B4", "#FFB6C1", "#FA8072", "#E9967A", "#F08080"
     ];
+
     let map = '';
     let imgLoaded = false; // 新增变量用于标记图片是否加载
 
@@ -99,21 +100,25 @@
 
         function resizeCanvas() {
             img.style.height = '100%';
-            // 设置画布大小
             canvas.width = img.clientWidth;
             canvas.height = img.clientHeight;
+            canvas.style.position = 'absolute';
+            canvas.style.top = '0';
+            canvas.style.left = '0';
+            canvas.style.pointerEvents = 'none';
         }
 
-        function drawPlayer(data) {
-            if (!imgLoaded) return; // 如果图片未加载则跳过
+        let localid = 0;
+        function drawPlayers(players) {
+            if (!imgLoaded) return; // If the image hasn't loaded, skip
 
-            ctx.reset();
-            for (let i = 1; i < data.length - 1; i++) {
-                const player = data[i].split(',');
-                const color = brightColorsHex[player[3]];
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the canvas
 
-                const x = parseFloat(player[1]) * canvas.width / img.naturalWidth;
-                const y = parseFloat(player[2]) * canvas.height / img.naturalHeight;
+            players.forEach(player => {
+                const color = brightColorsHex[player.team]; // Use team value for color
+
+                const x = player.position.x * canvas.width / img.naturalWidth;
+                const y = player.position.y * canvas.height / img.naturalHeight;
 
                 ctx.beginPath();
                 ctx.arc(x, y, 4, 0, 2 * Math.PI);
@@ -128,14 +133,25 @@
                 ctx.textAlign = 'center';
                 ctx.lineWidth = 3;
                 ctx.strokeStyle = "rgba(5,5,5,1)";
-                ctx.strokeText(player[0], x, y - 8);
+                ctx.strokeText("[" + player.team + "]" + player.name, x, y - 8);
                 ctx.fillStyle = color;
-                ctx.fillText(player[0], x, y - 8);
+                ctx.fillText("[" + player.team + "]" + player.name, x, y - 8);
                 ctx.closePath();
 
-                if (player[0] === input.value.trim()) {
+                if (player.name === input.value.trim()) {
+                    localid = player.team;
                     ctx.beginPath();
                     ctx.lineWidth = 2;
+                    ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height);
+                    ctx.stroke();
+                    ctx.closePath();
+                } else if (player.team === localid) {
+                    ctx.beginPath();
+                    ctx.lineWidth = 1.5;
                     ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
                     ctx.moveTo(0, y);
                     ctx.lineTo(canvas.width, y);
@@ -144,30 +160,44 @@
                     ctx.stroke();
                     ctx.closePath();
                 }
-            }
+            });
         }
 
+
         function connect() {
-            // Retrieve WebSocket URL from URL parameters
             const urlParams = new URLSearchParams(window.location.search);
             const wsParam = urlParams.get('ws');
             const wsUrl = wsParam ? `ws://${wsParam}` : `ws://127.0.0.1:2334`;
 
-            // Print the WebSocket URL to the console
-            // console.log(`Connecting to WebSocket server at: ${wsUrl}`);
-
             const socket = new WebSocket(wsUrl);
+
+            socket.onopen = function () {
+                console.log(`Connected to WebSocket server at: ${wsUrl}`);
+            };
+
             socket.onmessage = function (event) {
-                const data = event.data.split(';');
-                if (data[0] !== "Unknown" && data[0] !== "") {
-                    if (map !== data[0]) {
-                        img.src = data[0];
+                try {
+                    // 尝试将消息解码为有效的 UTF-8 字符串
+                    const data = JSON.parse(event.data);
+                    console.log(data);
+                    // 检查 map 和其他条件
+                    if (data.mapfile && data.mapfile !== map) {
+                        img.src = data.mapfile;
                     }
-                    requestAnimationFrame(() => drawPlayer(data)); // 使用requestAnimationFrame来平滑更新
+                    requestAnimationFrame(() => drawPlayers(data.players)); // 使用 requestAnimationFrame 来平滑更新
+
+                } catch (error) {
+                    console.warn("Received non-UTF-8 message, ignoring:", event.data);
                 }
             };
+
             socket.onclose = function () {
-                connect();
+                console.log("WebSocket connection closed. Reconnecting...");
+                setTimeout(connect, 1000); // 1秒后重新连接
+            };
+
+            socket.onerror = function (error) {
+                console.error("WebSocket error: ", error);
             };
         }
 
@@ -177,7 +207,6 @@
         };
 
         img.onerror = function () {
-            // 如果图片加载失败，保持之前的图片
             img.src = img.src; // 保持原有图片不变
         };
 
@@ -185,6 +214,7 @@
         window.addEventListener('resize', resizeCanvas);
     });
 </script>
+
 
 
 </html>
