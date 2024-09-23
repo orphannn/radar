@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HOOZI-RADAR</title>
+    <link rel="stylesheet" href="bootstrap.min.css">
+    <style>
+        body {
+            background-color: #191919;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        #websocket_radar {
+            width: 100vw;
+            /* 调整为适合的宽度 */
+            margin: 0 auto;
+            padding: 0;
+        }
+
+        #title_radar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 50px;
+        }
+
+        #map_info {
+            margin: 0 auto;
+            position: relative;
+            height: 100vh;
+        }
+
+        #id_img {
+            display: block;
+            height: 100%;
+        }
+
+        #id_canvas {
+            border: 2px solid whitesmoke;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            /* 防止canvas阻挡鼠标事件 */
+        }
+    </style>
+</head>
+
+<body>
+    <div id="websocket">
+        <ul class="list-group" id="websocket_radar" style="overflow: hidden;">
+            <li class="list-group-item" id="title_radar" aria-current="true">
+                <i class="fas">HOOZI BETA VERSION</i>
+                <input type="text" id="flower_name" class="form-control" placeholder="在此输入您的游戏名" aria-label="Username"
+                    aria-describedby="basic-addon1" style="display: inline-block; width: 180px;">
+            </li>
+            <div id="map_info">
+                <img id='id_img' src="icon.png" alt="Radar Map">
+                <canvas id='id_canvas'></canvas>
+            </div>
+        </ul>
+    </div>
+</body>
+<script src="jquery-3.5.1.min.js"></script>
+<script>
+    const input = document.getElementById('flower_name');
+    const savedValue = localStorage.getItem('flowerName');
+    if (savedValue) {
+        input.value = savedValue;
+    }
+    input.addEventListener('input', function (event) {
+        const value = event.target.value;
+        localStorage.setItem('flowerName', value);
+    });
+
+    const brightColorsHex = [
+        "#FFB6C1", "#FF69B4", "#FFC0CB", "#FF1493", "#FFA07A", "#FF7F50", "#FF6347",
+        "#FF4500", "#FF8C00", "#FFA500", "#FFD700", "#FFFF00", "#F0E68C", "#EEE8AA",
+        "#BDB76B", "#ADFF2F", "#7FFF00", "#7CFC00", "#00FF00", "#32CD32", "#90EE90",
+        "#98FB98", "#00FF7F", "#3CB371", "#20B2AA", "#00FFFF", "#00CED1", "#40E0D0",
+        "#48D1CC", "#AFEEEE", "#7FFFDE", "#B0E0E6", "#ADD8E6", "#87CEEB", "#87CEFA",
+        "#00BFFF", "#1E90FF", "#4682B4", "#6495ED", "#4169E1", "#8A2BE2", "#4B0082",
+        "#9932CC", "#BA55D3", "#DDA0DD", "#EE82EE", "#DA70D6", "#FF00FF", "#FF1493",
+        "#DB7093", "#FF69B4", "#FFB6C1", "#FA8072", "#E9967A", "#F08080"
+    ];
+
+    let map = '';
+    let imgLoaded = false; // 新增变量用于标记图片是否加载
+
+    $(document).ready(function () {
+        const img = document.getElementById("id_img");
+        const canvas = document.getElementById("id_canvas");
+        const ctx = canvas.getContext("2d");
+
+        function resizeCanvas() {
+            img.style.height = '100%';
+            canvas.width = img.clientWidth;
+            canvas.height = img.clientHeight;
+            canvas.style.position = 'absolute';
+            canvas.style.top = '0';
+            canvas.style.left = '0';
+            canvas.style.pointerEvents = 'none';
+        }
+
+        let localid = 0;
+        function drawPlayers(players) {
+            if (!imgLoaded) return; // If the image hasn't loaded, skip
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the canvas
+
+            players.forEach(player => {
+                const color = brightColorsHex[player.team]; // Use team value for color
+
+                const x = player.position.x * canvas.width / img.naturalWidth;
+                const y = player.position.y * canvas.height / img.naturalHeight;
+
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, 2 * Math.PI);
+                ctx.fillStyle = color;
+                ctx.fill();
+
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#000000';
+                ctx.stroke();
+
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = "rgba(5,5,5,1)";
+                ctx.strokeText("[" + player.team + "]" + player.name, x, y - 8);
+                ctx.fillStyle = color;
+                ctx.fillText("[" + player.team + "]" + player.name, x, y - 8);
+                ctx.closePath();
+
+                if (player.name === input.value.trim()) {
+                    localid = player.team;
+                    ctx.beginPath();
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height);
+                    ctx.stroke();
+                    ctx.closePath();
+                } else if (player.team === localid) {
+                    ctx.beginPath();
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height);
+                    ctx.stroke();
+                    ctx.closePath();
+                }
+            });
+        }
+
+
+        function connect() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const wsParam = urlParams.get('ws');
+            const wsUrl = wsParam ? `ws://${wsParam}` : `ws://127.0.0.1:2334`;
+
+            const socket = new WebSocket(wsUrl);
+
+            socket.onopen = function () {
+                console.log(`Connected to WebSocket server at: ${wsUrl}`);
+            };
+
+            socket.onmessage = function (event) {
+                try {
+                    // 尝试将消息解码为有效的 UTF-8 字符串
+                    const data = JSON.parse(event.data);
+                    console.log(data);
+                    // 检查 map 和其他条件
+                    if (data.mapfile && data.mapfile !== map) {
+                        img.src = data.mapfile;
+                    }
+                    requestAnimationFrame(() => drawPlayers(data.players)); // 使用 requestAnimationFrame 来平滑更新
+
+                } catch (error) {
+                    console.warn("Received non-UTF-8 message, ignoring:", event.data);
+                }
+            };
+
+            socket.onclose = function () {
+                console.log("WebSocket connection closed. Reconnecting...");
+                setTimeout(connect, 1000); // 1秒后重新连接
+            };
+
+            socket.onerror = function (error) {
+                console.error("WebSocket error: ", error);
+            };
+        }
+
+        img.onload = function () {
+            imgLoaded = true; // 标记图片已加载
+            resizeCanvas();
+        };
+
+        img.onerror = function () {
+            img.src = img.src; // 保持原有图片不变
+        };
+
+        connect();
+        window.addEventListener('resize', resizeCanvas);
+    });
+</script>
+
+
+
+</html>

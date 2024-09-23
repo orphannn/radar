@@ -165,11 +165,11 @@
 
 
         function connect() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const wsParam = urlParams.get('ws');
-            const wsUrl = wsParam ? `ws://${wsParam}` : `ws://127.0.0.1:2334`;
-
-            const socket = new WebSocket(wsUrl);
+            // const urlParams = new URLSearchParams(window.location.search);
+            // const wsParam = urlParams.get('ws');
+            // const wsUrl = wsParam ? `ws://${wsParam}` : `ws://127.0.0.1:2334`;
+            const socket = new WebSocket("ws://" + new URL(window.location.href).hostname + ":2334");
+            // const socket = new WebSocket(wsUrl);
 
             socket.onopen = function () {
                 console.log(`Connected to WebSocket server at: ${wsUrl}`);
