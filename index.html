@@ -171,9 +171,9 @@
             const socket = new WebSocket("ws://" + new URL(window.location.href).hostname + ":2334");
             // const socket = new WebSocket(wsUrl);
 
-            socket.onopen = function () {
-                console.log(`Connected to WebSocket server at: ${wsUrl}`);
-            };
+            // socket.onopen = function () {
+            //     console.log(`Connected to WebSocket server at: ${wsUrl}`);
+            // };
 
             socket.onmessage = function (event) {
                 try {
@@ -192,8 +192,8 @@
             };
 
             socket.onclose = function () {
-                console.log("WebSocket connection closed. Reconnecting...");
-                setTimeout(connect, 1000); // 1秒后重新连接
+                // console.log("WebSocket connection closed. Reconnecting...");
+                connect();
             };
 
             socket.onerror = function (error) {
